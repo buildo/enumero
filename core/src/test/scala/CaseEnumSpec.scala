@@ -5,9 +5,12 @@ import org.scalatest.{ Matchers, WordSpec }
 class CaseEnumSpec extends WordSpec with Matchers {
   sealed trait Planet extends CaseEnum
   object Planet {
-    case object Mercury extends Planet
-    case object Venus extends Planet
-    case object Earth extends Planet
+    final class Mercury() extends Planet
+    val Mercury: Planet = new Mercury()
+    final class Venus() extends Planet
+    val Venus: Planet = new Venus()
+    final class Earth() extends Planet
+    val Earth: Planet = new Earth()
   }
 
   "CaseEnumMacro" should {
@@ -38,7 +41,7 @@ class CaseEnumSpec extends WordSpec with Matchers {
         def fromString(str: String): Either[String, T] = instance.caseFromString(str) match {
           case Some(v) => Right(v)
           case None => Left(
-            s"$str is not a valid ${instance.name}. Valid values are: ${instance.values.mkString(", ")}"
+            s"$str is not a valid ${instance.name}. Valid values are: ${instance.values.map(_.getClass.getName.split('$').last).mkString(", ")}"
           )
         }
       }

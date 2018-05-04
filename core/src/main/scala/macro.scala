@@ -38,7 +38,7 @@ class enum extends StaticAnnotation {
 }
 
 object EnumMacro {
-  def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+  def impl(c: Context)(annottees: c.Expr[Any]*): c.Tree = {
     import c.universe.{ Try => _, _ }
 
     def modifiedClass(classDecl: ClassDef) =
@@ -49,15 +49,20 @@ object EnumMacro {
         case Failure(_) =>
           c.abort(c.enclosingPosition, "Annotation is only supported on objects")
         case Success((enumName, body)) =>
-          val members = body.map {
-            case Ident(memberName: TermName) =>
-              q"case object $memberName extends $enumName"
-            case q"object $memberName { ..$more  }" =>
-              q"case object $memberName extends $enumName"
+          def member(name: TermName): List[Tree] = {
+            val typeName = name.toTypeName
+            List(
+              q"final private[this] class $typeName() extends $enumName",
+              q"val $name: $enumName = new $typeName()"
+            )
+          }
+          val members = body.flatMap {
+            case Ident(memberName: TermName) => member(memberName)
+            case q"object $memberName { ..$more  }" => member(memberName)
             case _ =>
               c.abort(c.enclosingPosition, "Enum members should be plain objects")
           }
-          c.Expr(q"""
+          val x: c.Tree = q"""
             sealed abstract trait $enumName extends _root_.io.buildo.enumero.CaseEnum
             object ${enumName.toTermName} {
               ..$members
@@ -66,7 +71,9 @@ object EnumMacro {
               def caseFromString(str: String)(implicit ces: _root_.io.buildo.enumero.CaseEnumSerialization[$enumName]): Option[$enumName] = ces.caseFromString(str)
               def name(implicit ces: _root_.io.buildo.enumero.CaseEnumSerialization[$enumName]): String = ces.name
             }
-          """)
+          """
+          // println(x)
+          x
       }
 
     annottees.map(_.tree) match {
@@ -108,11 +115,11 @@ object EnumMacro {
 class indexedEnum extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro IndexedEnumMacro.impl
 }
- 
+
 object IndexedEnumMacro {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
- 
+
     def modifiedClass(classDecl: ClassDef) = {
       val (enumName, body) = try {
         val q"trait $enumName { ..$body }" = classDecl

@@ -15,7 +15,7 @@ import scala.reflect.macros.blackbox.Context
  * }
  * ```
  */
-trait CaseEnum extends Product with Serializable
+trait CaseEnum
 
 /**
  * Typeclass with conversions to and from strings for ADTs representing enumerations
@@ -49,11 +49,11 @@ object CaseEnumMacro {
     val typeName = tpe.typeSymbol
     val companion = tpe.typeSymbol.companion
     val enumElements = tpe.typeSymbol.companion.typeSignature.decls.collect {
-      case x: ModuleSymbol => x
+      case x: ClassSymbol if x.isFinal => x
     }.toList
 
     val mapComponents = enumElements.map { x =>
-      val name = x.name
+      val name = x.name.toTermName
       val decoded = name.decodedName.toString
       q"($companion.$name, $decoded)"
     }
